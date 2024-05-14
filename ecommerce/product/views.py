@@ -12,7 +12,7 @@ class ProductView(APIView):
         try:
             products = Product.objects.all()
             search_query = request.GET.get('search')
-
+            
             if search_query:
                 products = Product.objects.filter(Q(name__icontains=search_query))
 
