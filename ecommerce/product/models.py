@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 
 
 class Category(models.TextChoices):
+    
     ELECTRONICS = 'Electronics'
     ARTS = 'Arts'
     CLOTHES = 'Clothes'
@@ -14,6 +15,7 @@ class Category(models.TextChoices):
 
 
 class Product(models.Model):
+
     name = models.CharField(max_length=100, default="", blank=False)
     description = models.TextField(max_length=1000, default="", blank=False)
     price = models.DecimalField(max_digits=7, decimal_places=2, default=0)
@@ -27,3 +29,9 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class ProductImages(models.Model):
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, related_name='images')
+    image = models.ImageField(upload_to='products')
