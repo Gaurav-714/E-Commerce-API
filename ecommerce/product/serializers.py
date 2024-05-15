@@ -11,9 +11,15 @@ class ProductImagesSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
 
-    images = ProductImagesSerializer(many=True)
+    images = ProductImagesSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
-        fields = ['id','name','brand','category','description','price','stock','user','images']
+        fields = ['id','name','brand','category','description','price','stock','ratings','user','images']
+        extra_kwargs = {
+            'name': { 'required': True },
+            'brand': { 'required': True },
+            'description': { 'required': True },
+            'price': { 'required': True }
+        }
 
