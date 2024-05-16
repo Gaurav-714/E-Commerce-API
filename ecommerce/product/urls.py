@@ -7,4 +7,6 @@ urlpatterns = [
     path('product/images', UploadProductImage.as_view()),
     path('product/update/<int:pk>', UpdateProductView.as_view()),
     path('product/delete/<int:pk>', DeleteProductView.as_view()),
+    path('product/review/<int:pk>', ReviewProduct.as_view()),
+    path('product/review/delete/<int:pk>', DeleteReview.as_view()),
 ]

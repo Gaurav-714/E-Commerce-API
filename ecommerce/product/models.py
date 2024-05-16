@@ -45,3 +45,14 @@ class ProductImages(models.Model):
 def auto_delete_files_on_delete(sender, instance, **kwargs):
     if instance.image:
         instance.image.delete(save = False)
+
+
+class ProductReview(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.DecimalField(max_digits = 2, decimal_places = 1, default=0)
+    review = models.TextField(blank=False)
+    createdAt = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.review

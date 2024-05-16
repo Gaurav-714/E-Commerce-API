@@ -5,11 +5,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from django.db.models import Q
+from django.db.models import Avg
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 
-from .models import Product, ProductImages
-from .serializers import ProductSerializer, ProductImagesSerializer
+from .models import Product, ProductImages, ProductReview
+from .serializers import ProductSerializer, ProductImagesSerializer, ProductReviewSerializer
 from .filters import ProductFilter
 
 
@@ -165,6 +166,102 @@ class DeleteProductView(APIView):
             return Response({
                 'success': True,
                 'message': 'Product deleted successfully.'
+            })
+
+        except Exception as ex:
+            return Response({
+                'success': False,
+                'message': 'Something went wrong.',
+                'error': str(ex)
+            })
+        
+
+class ReviewProduct(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            data = request.data
+
+            if data['rating'] <= 0 or data['rating']> 5:
+                return Response({
+                    'success': False,
+                    'error': 'Please rate from 1 to 5.'
+                })
+
+            product = get_object_or_404(Product, id=pk)
+            review = product.reviews.filter(user=request.user)            
+
+            if review.exists():
+                new_review = { 'review':data['review'], 'rating': data['rating'] } 
+                review.update(**new_review)
+
+                rating = product.reviews.aggregate(avg_ratings=Avg('rating'))
+                product.rating = rating['avg_ratings']
+                product.save()
+
+                return Response({
+                    'success': True,
+                    'message': 'Review updated successfully.',
+                    'data': data
+                })
+
+            ProductReview.objects.create(
+                user = request.user,
+                product = product,
+                review = data['review'],
+                rating = data['rating']
+            )
+            rating = product.reviews.aggregate(avg_ratings=Avg('rating'))
+            product.rating = rating['avg_ratings']
+            product.save()
+
+            return Response({
+                'success': True,
+                'message': 'Review posted successfully.',
+                'data': data
+            })
+            
+        except Exception as ex:
+            return Response({
+                'success': False,
+                'message': 'Something went wrong.',
+                'error': str(ex)
+            })
+        
+
+class DeleteReview(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        try:
+            product = get_object_or_404(Product, id=pk)
+            review = product.reviews.filter(user=request.user)
+
+            if review.exists():
+            
+                review.delete()
+
+                rating = product.reviews.aggregate(avg_ratings=Avg('rating'))
+
+                if rating['avg_ratings'] is None:
+                    product.rating = 0
+
+                product.rating = rating['avg_ratings']
+                product.save()
+
+                return Response({
+                    'success': True,
+                    'message': 'Review deleted successfully.'
+                })
+            
+            return Response({
+                'success': False,
+                'message': 'Review does not exists.',
             })
 
         except Exception as ex:
