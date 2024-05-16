@@ -1,8 +1,13 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
+
 from .models import Product, ProductImages
 from .serializers import ProductSerializer, ProductImagesSerializer
 from .filters import ProductFilter
@@ -37,9 +42,13 @@ class ProductsView(APIView):
 
 
 class UploadProductView(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         try:
-            data = request.data
+            data = request.data            
             serializer = ProductSerializer(data=data)
 
             if serializer.is_valid():
@@ -65,6 +74,10 @@ class UploadProductView(APIView):
 
 
 class UploadProductImage(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         try:
             data = request.data
@@ -92,12 +105,20 @@ class UploadProductImage(APIView):
         
 
 class UpdateProductView(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def patch(self, request, pk):
         try:
-            data = request.data
             product = get_object_or_404(Product, id=pk)
-            serializer = ProductSerializer(data=data, instance=product, partial=True)
-
+            if product.user != request.user:
+                return Response({
+                    'success': False,
+                    'message': 'You are not authorized for this.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            serializer = ProductSerializer(data=request.data, instance=product, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response({
@@ -121,9 +142,18 @@ class UpdateProductView(APIView):
         
 
 class DeleteProductView(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
     def delete(self, request, pk):
         try:
             product = get_object_or_404(Product, id=pk)
+            if product.user != request.user:
+                return Response({
+                    'success': False,
+                    'message': 'You are not authorized for this.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
 
             args = { 'product': pk }
             images = ProductImages.objects.filter(**args)

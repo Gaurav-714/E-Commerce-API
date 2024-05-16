@@ -16,11 +16,11 @@ def custom_exception_handler(exe, context):
                 'details': []
             }
         }
-        error = error_payload(error)
+        error = error_payload['error']
         status_code = response.status_code
 
         error['status_code'] = status_code
-        error['message'] = http_code_to_message(status_code)
+        error['message'] = http_code_to_message[status_code]
         error['details'] = response.data
 
         response.data = error_payload
