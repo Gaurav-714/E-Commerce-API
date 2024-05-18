@@ -4,6 +4,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import User
+import stripe.error
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from .filters import OrderFilter
@@ -178,50 +180,132 @@ class DeleteOrderView(APIView):
         }) 
 
 
-stripe.api_key = os.environ.get('STRIPE_PRIVATE_KEY')
-
 class CheckoutSessionView(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        user = request.user
-        data = request.data
+        try:
+            user = request.user
+            data = request.data
+            order_items = data['order_items']
 
-        order_items = data['order_items']
+            stripe.api_key = os.environ.get('STRIPE_PRIVATE_KEY')
 
-        shipping_details = {
-            'area': data['area'],
-            'city': data['city'],
-            'state': data['state'],
-            'country': data['country'],
-            'zip_code': data['zip_code'],
-            'phone_no': data['phone_no'],
-            'user': user.id
-        }
+            shipping_details = {
+                'area': data['area'],
+                'city': data['city'],
+                'state': data['state'],
+                'country': data['country'],
+                'zip_code': data['zip_code'],
+                'phone_no': data['phone_no'],
+                'user': user.id
+            }
 
-        checkout_order_items = []
-        for item in order_items:
-            checkout_order_items.append({
-                'price_data': {
-                    'currrency': 'INR',
-                    'product_data': {
-                        'name': item['name'],
-                        'images': [item['image']],
-                        'metadata': {'prodcut_id': item['product']}
+            checkout_order_items = []
+            for item in order_items:
+                checkout_order_items.append({
+                    'price_data': {
+                        'currency': 'INR',
+                        'product_data': {
+                            'name': item['name'],
+                            'images': [item['image']],
+                            'metadata': {'product_id': item['product']}
+                        },
+                        'unit_amount': item['price'] * 100
                     },
-                    'unit_amount': item['price']  * 100
-                },
-                'quantity': item['quantity'] 
+                    'quantity': item['quantity'] 
+                })
+
+            YOUR_DOMAIN = get_current_host(request)
+
+            session = stripe.checkout.Session.create(
+                payment_method_types = ['card'],
+                metadata = shipping_details,
+                line_items = checkout_order_items,
+                customer_email = user.email,
+                mode = 'payment',
+                success_url = YOUR_DOMAIN,
+                cancel_url = YOUR_DOMAIN
+            )
+
+            return Response({
+                'succuss': True,
+                'session' : session
             })
+        
+        except Exception as ex:
+            return Response({
+                'success': False,
+                'message': 'Error occured.',
+                'error': str(ex)
+            })
+    
 
-        YOUR_DOMAIN = get_current_host()
+class StripeWebhookView(APIView):
 
-        session = stripe.checkout.Session.create(
-            payment_method_types = ['card'],
-            metadata = shipping_details,
-            line_items = checkout_order_items,
-            customer_email = user.email,
-            mode = 'payment',
-            success_url = YOUR_DOMAIN,
-            cancel_url = YOUR_DOMAIN
-        )
+    def post(self, request):
+        try:
+            webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
+            payload = request.body
+            sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+            print('sig_header : ', sig_header)
+            event = None
 
-        return Response({ 'session' : session })
+            try:
+                event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+            except ValueError as ex:
+                return Response({'message': 'Invalid Payload', 'error': str(ex)})
+            except stripe.error.SignatureVerificationError as ex:
+                return Response({'message': 'Invalid Signature', 'error': str(ex)})
+            
+            if event['type'] == 'checkout.session.completed':
+                session = event['data']['object']
+            
+                line_items = stripe.checkout.Session.list_line_items(session['id'])
+                price = session['amount_total'] / 100
+
+                order = Order.objects.create(
+                    user = User(session.metadata.user),
+                    area = session.metadata.area,
+                    city = session.metadata.city,
+                    state = session.metadata.state,
+                    country = session.metadata.country,
+                    zip_code = session.metadata.zip_code,
+                    phone_no = session.metadata.phone_no,
+                    total_amount = price,
+                    payment_mode = 'Card',
+                    payment_status = 'PAID'
+                )
+
+                for item in line_items:
+                    print('item:', item)
+                    line_product = stripe.Product.retrieve(item.price.product)
+                    product_id = line_product.metadata.product_id
+
+                    product = Product.objects.get(id=product_id)
+
+                    items = OrderItem.objects.create(
+                        product = product,
+                        order = order,
+                        name = product.name,
+                        quantity = item.quantity,
+                        price = item.price.unit_amount / 100,
+                        image = line_product.images[0]
+                    )
+
+                    product.stock -= items.quantity
+                    product.save()
+
+                return Response({
+                    'success': True,
+                    'message': 'Payment Successfull'
+                })
+        
+        except Exception as ex:
+            return Response({
+                'success': False,
+                'message': 'Error occured.',
+                'error': str(ex)
+            })
