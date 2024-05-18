@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     'sslserver',
 
     'product',
-    'account'
+    'account',
+    'order'
 ]
 
 
