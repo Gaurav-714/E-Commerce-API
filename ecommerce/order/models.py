@@ -39,15 +39,15 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
         
     def __str__(self):
-        return self.id
+        return str(self.id)
     
 
 class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='orderitems')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='orderItems')
     name = models.CharField(max_length=200, default='', blank=False)
     quantity = models.IntegerField(default=1)
     price = models.DecimalField(max_digits=7, decimal_places=2, blank=False)
 
     def __str__(self):
-        return self.name
+        return str(self.name)

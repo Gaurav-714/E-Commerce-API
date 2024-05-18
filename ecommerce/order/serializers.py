@@ -18,6 +18,6 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_order_items(self, obj):
-        orderitems = obj.orderitems.all()
-        serializer = OrderItemsSerializer(orderitems, many=True)
+        order_items = obj.orderItems.all()
+        serializer = OrderItemsSerializer(order_items, many=True)
         return serializer.data

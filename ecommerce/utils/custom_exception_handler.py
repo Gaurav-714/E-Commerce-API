@@ -32,4 +32,3 @@ def custom_exception_handler(exe, context):
             'error': 'Something went wrong.'
         }
         return Response(error, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    

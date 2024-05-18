@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from django.db.models import Q
@@ -45,7 +45,7 @@ class ProductsView(APIView):
 class UploadProductView(APIView):
 
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def post(self, request):
         try:
@@ -77,7 +77,7 @@ class UploadProductView(APIView):
 class UploadProductImage(APIView):
 
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def post(self, request):
         try:
@@ -108,7 +108,7 @@ class UploadProductImage(APIView):
 class UpdateProductView(APIView):
 
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def patch(self, request, pk):
         try:
@@ -145,7 +145,7 @@ class UpdateProductView(APIView):
 class DeleteProductView(APIView):
 
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def delete(self, request, pk):
         try:
