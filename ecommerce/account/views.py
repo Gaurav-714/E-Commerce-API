@@ -13,6 +13,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from .serializers import RegisterSerializer, LoginSerializer, UpdateSerializer
+from utils.helpers import get_current_host
 
 
 class RegisterUserView(APIView):
@@ -114,11 +115,6 @@ class ForgotPasswordView(APIView):
             user.profile.reset_password_token = token
             user.profile.reset_password_expiry = expiry_date
             user.profile.save()
-
-            def get_current_host(request):
-                protocol = request.is_secure() and 'http' or 'https'
-                host = request.get_host()
-                return f"{protocol}://{host}/"
             
             host = get_current_host(request)
 

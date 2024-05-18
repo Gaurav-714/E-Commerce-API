@@ -8,6 +8,9 @@ from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from .filters import OrderFilter
 from product.models import Product
+from utils.helpers import get_current_host
+import stripe
+import os
 
 
 class PlaceOrderView(APIView):
@@ -173,3 +176,52 @@ class DeleteOrderView(APIView):
             'success': True,
             'message': 'Order deleted successfully.',
         }) 
+
+
+stripe.api_key = os.environ.get('STRIPE_PRIVATE_KEY')
+
+class CheckoutSessionView(APIView):
+    def post(self, request):
+        user = request.user
+        data = request.data
+
+        order_items = data['order_items']
+
+        shipping_details = {
+            'area': data['area'],
+            'city': data['city'],
+            'state': data['state'],
+            'country': data['country'],
+            'zip_code': data['zip_code'],
+            'phone_no': data['phone_no'],
+            'user': user.id
+        }
+
+        checkout_order_items = []
+        for item in order_items:
+            checkout_order_items.append({
+                'price_data': {
+                    'currrency': 'INR',
+                    'product_data': {
+                        'name': item['name'],
+                        'images': [item['image']],
+                        'metadata': {'prodcut_id': item['product']}
+                    },
+                    'unit_amount': item['price']  * 100
+                },
+                'quantity': item['quantity'] 
+            })
+
+        YOUR_DOMAIN = get_current_host()
+
+        session = stripe.checkout.Session.create(
+            payment_method_types = ['card'],
+            metadata = shipping_details,
+            line_items = checkout_order_items,
+            customer_email = user.email,
+            mode = 'payment',
+            success_url = YOUR_DOMAIN,
+            cancel_url = YOUR_DOMAIN
+        )
+
+        return Response({ 'session' : session })

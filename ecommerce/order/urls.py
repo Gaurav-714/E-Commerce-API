@@ -7,4 +7,5 @@ urlpatterns = [
     path('order/view/<int:pk>', GetOrderView.as_view()),
     path('order/update/<int:pk>', UpdateOrderView.as_view()),
     path('order/delete/<int:pk>', DeleteOrderView.as_view()),
+    path('order/checkout-session', CheckoutSessionView.as_view()),
 ]
