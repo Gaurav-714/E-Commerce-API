@@ -10,7 +10,7 @@ class OrderItemsSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    
+
     order = serializers.SerializerMethodField(method_name='get_order_items', read_only=True)
 
     class Meta:
@@ -18,6 +18,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_order_items(self, obj):
+        
         order_items = obj.orderItems.all()
         serializer = OrderItemsSerializer(order_items, many=True)
+
         return serializer.data

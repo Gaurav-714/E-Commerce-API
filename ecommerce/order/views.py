@@ -3,13 +3,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, get_list_or_404
 from django.contrib.auth.models import User
 import stripe.error
 from .models import Order, OrderItem
-from .serializers import OrderSerializer
+from .serializers import OrderSerializer, OrderItemsSerializer
 from .filters import OrderFilter
-from product.models import Product
+from product.models import Product, ProductImages
 from utils.helpers import get_current_host
 import stripe
 import os
@@ -26,13 +26,18 @@ class PlaceOrderView(APIView):
             data = request.data
             order_items = data['order_items']
             
-            if order_items and len(order_items) == 0:
+            if len(order_items) == 0:
                 return Response({
                     'success': False,
                     'error': 'No order items. Please add atleast one product.'
                 })
             
-            total_amount = sum(item['price'] * item['quantity'] for item in order_items)
+            total_amount = 0
+            for item in order_items:
+                product = Product.objects.get(id=item['product'])
+                quantity = item['quantity']
+
+                total_amount += product.price * quantity
 
             order = Order.objects.create(
                 user = user,
@@ -47,19 +52,21 @@ class PlaceOrderView(APIView):
 
             for i in order_items:
                 product = Product.objects.get(id=i['product'])
+                product_img = ProductImages.objects.get(id=i['product'])
 
                 item = OrderItem.objects.create(
                     product = product,
                     order = order,
                     name = product.name,
                     quantity = i['quantity'],
-                    price = i['price']
+                    price = product.price,
+                    image = product_img.image
                 )
-
+            
                 product.stock -= item.quantity
                 product.save()
 
-            serializer = OrderSerializer(order)
+            serializer = OrderSerializer(order, many=False)
 
             return Response({
                 'success': True,
@@ -82,7 +89,8 @@ class GetAllOrdersView(APIView):
 
     def get(self, request):
         try:
-            filterset = OrderFilter(request.GET, queryset=Order.objects.all().order_by('id'))
+            user = request.user
+            filterset = OrderFilter(request.GET, queryset=Order.objects.filter(user=user).order_by('id'))
             count = filterset.qs.count()
 
             page_no = request.GET.get('page', 1)
@@ -90,6 +98,13 @@ class GetAllOrdersView(APIView):
             paginator = Paginator(filterset.qs, res_per_page)
 
             serializer = OrderSerializer(paginator.page(page_no), many=True)
+
+            if len(serializer.data) == 0:
+                return Response({
+                    'success': False,
+                    'message': 'You have not ordered anything yet.',
+                    'data': []
+                }) 
 
             return Response({
                 'success': True,
@@ -116,6 +131,12 @@ class GetOrderView(APIView):
         try:
             order = Order.objects.get(id=pk)               
             serializer = OrderSerializer(order)
+
+            if order.user != request.user:
+                return Response({
+                    'success': False,
+                    'message': 'You cannot view others orders.'
+                }) 
 
             return Response({
                 'success': True,
@@ -185,49 +206,54 @@ class CheckoutSessionView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, pk):
         try:
             user = request.user
-            data = request.data
-            order_items = data['order_items']
+            order_items = request.data['order_items']
+            order_data = Order.objects.get(id=pk)
 
             stripe.api_key = os.environ.get('STRIPE_PRIVATE_KEY')
 
             shipping_details = {
-                'area': data['area'],
-                'city': data['city'],
-                'state': data['state'],
-                'country': data['country'],
-                'zip_code': data['zip_code'],
-                'phone_no': data['phone_no'],
+                'area': order_data.area,
+                'city': order_data.city, 
+                'state': order_data.state,
+                'country': order_data.country,
+                'zip_code': order_data.zip_code,
+                'phone_no': order_data.phone_no,
                 'user': user.id
             }
 
             checkout_order_items = []
+
             for item in order_items:
+
+                product = Product.objects.get(id=item['product'])
+                product_img = ProductImages.objects.get(id=item['product'])
+                image = 'http://127.0.0.1:8000/api/' + str(product_img.image)
+                print(image)
+
                 checkout_order_items.append({
                     'price_data': {
                         'currency': 'INR',
                         'product_data': {
-                            'name': item['name'],
-                            'images': [item['image']],
+                            'name': product.name,
+                            'images': [image],
                             'metadata': {'product_id': item['product']}
                         },
-                        'unit_amount': item['price'] * 100
+                        'unit_amount': int(product.price * 100)
                     },
                     'quantity': item['quantity'] 
                 })
 
-            YOUR_DOMAIN = get_current_host(request)
-
             session = stripe.checkout.Session.create(
-                payment_method_types = ['card'],
-                metadata = shipping_details,
-                line_items = checkout_order_items,
-                customer_email = user.email,
-                mode = 'payment',
-                success_url = YOUR_DOMAIN,
-                cancel_url = YOUR_DOMAIN
+                payment_method_types=['card'],
+                metadata=shipping_details,
+                line_items=checkout_order_items,
+                customer_email=user.email,
+                mode='payment',
+                success_url='http://127.0.0.1:8000/api/products',
+                cancel_url='http://127.0.0.1:8000/api/products'
             )
 
             return Response({
@@ -249,9 +275,11 @@ class StripeWebhookView(APIView):
         try:
             webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
             payload = request.body
-            sig_header = request.META['HTTP_STRIPE_SIGNATURE']
-            print('sig_header : ', sig_header)
+            sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
             event = None
+
+            if sig_header is None:
+                return Response({'message': 'Missing Stripe Signature Header'}, status=400)
 
             try:
                 event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
@@ -280,7 +308,7 @@ class StripeWebhookView(APIView):
                 )
 
                 for item in line_items:
-                    print('item:', item)
+                    
                     line_product = stripe.Product.retrieve(item.price.product)
                     product_id = line_product.metadata.product_id
 

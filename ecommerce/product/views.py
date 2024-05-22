@@ -113,6 +113,8 @@ class UpdateProductView(APIView):
     def patch(self, request, pk):
         try:
             product = get_object_or_404(Product, id=pk)
+            print(product.user)
+            print(request.user)
             if product.user != request.user:
                 return Response({
                     'success': False,
@@ -185,14 +187,21 @@ class ReviewProduct(APIView):
         try:
             data = request.data
 
-            if data['rating'] <= 0 or data['rating']> 5:
+            if data['rating'] <= 0 or data['rating'] > 5:
                 return Response({
                     'success': False,
                     'error': 'Please rate from 1 to 5.'
-                })
+                }, status=status.HTTP_406_NOT_ACCEPTABLE)
 
             product = get_object_or_404(Product, id=pk)
-            review = product.reviews.filter(user=request.user)            
+            review = product.reviews.filter(user=request.user) 
+
+            obj = get_object_or_404(ProductReview, user=request.user.id)
+            if obj.user != request.user:
+                return Response({
+                    'success': False,
+                    'message': 'You are not authorized for this.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
 
             if review.exists():
                 new_review = { 'review':data['review'], 'rating': data['rating'] } 
@@ -241,6 +250,7 @@ class DeleteReview(APIView):
         try:
             product = get_object_or_404(Product, id=pk)
             review = product.reviews.filter(user=request.user)
+            print(review)
 
             if review.exists():
             
