@@ -15,7 +15,8 @@ from pathlib import Path
 import os
 
 import dotenv
-dotenv.read_dotenv()
+#dotenv.read_dotenv()
+dotenv.load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -116,7 +117,7 @@ WSGI_APPLICATION = 'ecommerce.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-"""
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -127,15 +128,15 @@ DATABASES = {
         'PORT': os.environ.get('DATABASE_PORT')
     }
 }
-"""
 
-import dj_database_url
+
+"""import dj_database_url
 from decouple import config
 
 DATABASES = {
     'default': dj_database_url.config(default=config('DATABASE_URL'))
 }
-
+"""
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 
@@ -185,7 +186,7 @@ USE_TZ = False
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
@@ -194,3 +195,15 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+"""
+DATABASE_URL="postgres://default:82wRQciqTOtz@ep-sparkling-boat-a4k5uo8v.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require"
+
+POSTGRES_URL="postgres://default:82wRQciqTOtz@ep-sparkling-boat-a4k5uo8v-pooler.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require"
+POSTGRES_PRISMA_URL="postgres://default:82wRQciqTOtz@ep-sparkling-boat-a4k5uo8v-pooler.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require&pgbouncer=true&connect_timeout=15"
+POSTGRES_URL_NO_SSL="postgres://default:82wRQciqTOtz@ep-sparkling-boat-a4k5uo8v-pooler.us-east-1.aws.neon.tech:5432/verceldb"
+POSTGRES_URL_NON_POOLING="postgres://default:82wRQciqTOtz@ep-sparkling-boat-a4k5uo8v.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require"
+POSTGRES_USER="default"
+POSTGRES_HOST="ep-sparkling-boat-a4k5uo8v-pooler.us-east-1.aws.neon.tech"
+POSTGRES_PASSWORD="82wRQciqTOtz"
+POSTGRES_DATABASE="verceldb"
+"""
